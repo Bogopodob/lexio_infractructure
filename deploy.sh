@@ -105,6 +105,7 @@ docker run --rm \
   -v lexio-frontend-build:/app \
   -v "$ROOT/frontend-dist:/out" \
   -e "VITE_API_URL=https://${API_HOST}/api" \
+  -e "NODE_OPTIONS=--max-old-space-size=512" \
   node:22-alpine sh -c "cp -a /src/. /app/ && rm -rf /app/node_modules /app/dist && cd /app && npm ci --no-audit --no-fund && npm run build && cp -r dist/. /out/"
 echo "Frontend built with VITE_API_URL=https://${API_HOST}/api"
 
