@@ -36,8 +36,8 @@ set -a; . "$INFRA/.env"; set +a
 BOUND=$( (ss -tln 2>/dev/null || netstat -tln 2>/dev/null) | grep -E "[:.]${NGINX_PORT} " || true )
 if [ -n "$BOUND" ]; then
   NGINX_CONTAINER_EXPECTED=${NGINX_CONTAINER_NAME:-lexio_nginx}
-  # e.g. "80/tcp -> 0.0.0.0:81"
-  if ! docker port "$NGINX_CONTAINER_EXPECTED" 2>/dev/null | grep -qE "0\.0\.0\.0:${NGINX_PORT}->|127\.0\.0\.1:${NGINX_PORT}->"; then
+  # docker port output e.g. "80/tcp -> 0.0.0.0:81" (arrow before host:port)
+  if ! docker port "$NGINX_CONTAINER_EXPECTED" 2>/dev/null | grep -qE -- "-> (0\.0\.0\.0|127\.0\.0\.1):${NGINX_PORT}$"; then
     echo "FATAL: host port $NGINX_PORT is taken — pick a free one in .env and retry."
     exit 1
   fi
