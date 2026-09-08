@@ -1,0 +1,14 @@
+# --- Secrets / env ---
+.env
+
+# --- Local DB / infra backups ---
+*.sql
+*.sql.gz
+.backups/
+
+# --- Frontend build output (created by deploy.sh) ---
+/frontend-dist/
+
+# --- OS / editor ---
+.DS_Store
+*.swp

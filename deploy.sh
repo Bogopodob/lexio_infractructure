@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Lexio PROD deploy (VPS). Idempotent: safe to re-run.
-# Run from /var/www/lexio/infractructure/prod. Never touches curatio.
+# Run from /var/www/lexio/infractructure. Never touches curatio.
 set -euo pipefail
 
 ROOT=/var/www/lexio
-PROD=$ROOT/infractructure/prod
-COMPOSE="docker compose --env-file $PROD/.env -f $PROD/docker-compose.yml"
+INFRA=$ROOT/infractructure
+COMPOSE="docker compose --env-file $INFRA/.env -f $INFRA/docker-compose.yml"
 
 need() { command -v "$1" >/dev/null 2>&1 || { echo "FATAL: missing $1"; exit 1; }; }
 need docker
@@ -20,19 +20,19 @@ done
 echo "--- curatio containers BEFORE (must be identical AFTER) ---"
 docker ps --format '{{.Names}} {{.Status}}' | grep -E '^curatio_' || echo "(no curatio_* containers seen)"
 
-# --- 1. prod .env ------------------------------------------------------------
-if [ ! -f "$PROD/.env" ]; then
-  cp "$PROD/.env.example" "$PROD/.env"
+# --- 1. infra .env -------------------------------------------------------------
+if [ ! -f "$INFRA/.env" ]; then
+  cp "$INFRA/.env.example" "$INFRA/.env"
   PW=$(openssl rand -base64 24 | tr -d '\n')
-  sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$PW/" "$PROD/.env"
-  echo "Created $PROD/.env with a fresh DB password."
+  sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$PW/" "$INFRA/.env"
+  echo "Created $INFRA/.env with a fresh DB password."
 fi
 # shellcheck disable=SC1091
-set -a; . "$PROD/.env"; set +a
+set -a; . "$INFRA/.env"; set +a
 
 # --- 2. free port check (curatio owns 8080; we take NGINX_PORT) ---------------
 if (ss -tln 2>/dev/null || netstat -tln 2>/dev/null) | grep -qE "[:.]${NGINX_PORT} "; then
-  echo "FATAL: host port $NGINX_PORT is taken — pick a free one in prod/.env and retry."
+  echo "FATAL: host port $NGINX_PORT is taken — pick a free one in .env and retry."
   exit 1
 fi
 
