@@ -97,16 +97,19 @@ fi
 
 # --- 6. frontend prod build (API URL is baked in) ------------------------------
 mkdir -p "$ROOT/frontend-dist"
-# Work in a writable named volume: /src is mounted ro so npm needs /app writable.
-# lexio-frontend-build persists node_modules between deploy runs (faster next time);
-# a fresh copy of source guarantees correctness, then dist lands in frontend-dist.
+# /src is mounted ro, so build inside a fresh writable volume. npm ci does a
+# clean install each time, so a persistent node_modules has no benefit — but a
+# persistent npm cache volume keeps downloads fast. Recreate the build volume so
+# a previously OOM-crashed/partial extraction can never poison the next build.
+docker volume rm lexio-frontend-build 2>/dev/null || true
 docker run --rm \
   -v "$ROOT/frontend:/src:ro" \
   -v lexio-frontend-build:/app \
+  -v lexio-frontend-npm-cache:/root/.npm \
   -v "$ROOT/frontend-dist:/out" \
   -e "VITE_API_URL=https://${API_HOST}/api" \
   -e "NODE_OPTIONS=--max-old-space-size=512" \
-  node:22-alpine sh -c "cp -a /src/. /app/ && rm -rf /app/node_modules /app/dist && cd /app && npm ci --no-audit --no-fund && npm run build && cp -r dist/. /out/"
+  node:22-alpine sh -c "cp -a /src/. /app/ && cd /app && npm ci --no-audit --no-fund && npm run build && cp -r dist/. /out/"
 echo "Frontend built with VITE_API_URL=https://${API_HOST}/api"
 
 # --- 7. smoke (container level; host TLS is checked separately) ----------------
