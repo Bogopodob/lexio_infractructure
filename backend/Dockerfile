@@ -36,6 +36,15 @@ RUN pecl install -f rdkafka-6.0.3 \
 RUN pecl install xdebug \
     && docker-php-ext-enable xdebug
 
+# GD (required by phpoffice/phpspreadsheet at install time; used by imports).
+# Kept last so rebuilds reuse all cached layers above.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libpng-dev libjpeg-dev \
+    && docker-php-ext-configure gd --with-jpeg \
+    && docker-php-ext-install gd \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /var/www/backend
 
 CMD ["php-fpm"]
