@@ -1,0 +1,107 @@
+# Lexio LOCAL DEV stack (laptop). Not used on the VPS.
+# The committed docker-compose.yml at the repo root is the PRODUCTION stack
+# (php + nginx + postgres); this file adds what prod intentionally lacks:
+# the vite frontend, rabbitmq, a published DB port and xdebug.
+#
+#   make up              # starts the full dev stack
+#   make frontend-shell  # shell into the vite container (lexio_frontend)
+#
+# Uses .env.example as the dev env; never the prod .env.
+
+services:
+  php:
+    container_name: ${PHP_CONTAINER_NAME}
+    build:
+      context: ..
+      dockerfile: infractructure/backend/Dockerfile
+    user: "${APP_UID}:${APP_GID}"
+    working_dir: /var/www/backend
+    volumes:
+      - ../backend:/var/www/backend
+      - ./backend/custom-php.ini:/usr/local/etc/php/conf.d/custom.ini:ro
+      - ./backend/xdebug.ini:/usr/local/etc/php/conf.d/xdebug.ini:ro
+    environment:
+      XDEBUG_MODE: ${XDEBUG_MODE}
+      XDEBUG_CONFIG: client_host=${XDEBUG_CLIENT_HOST} client_port=${XDEBUG_CLIENT_PORT}
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+    networks:
+      - lexio
+
+  frontend:
+    container_name: ${FRONTEND_CONTAINER_NAME}
+    build:
+      context: ..
+      dockerfile: infractructure/frontend/Dockerfile
+    working_dir: /usr/src/app
+    volumes:
+      - ../frontend:/usr/src/app
+      - frontend_node_modules:/usr/src/app/node_modules
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+    expose:
+      - "5173"
+    networks:
+      - lexio
+
+  nginx:
+    container_name: ${NGINX_CONTAINER_NAME}
+    image: nginx:1.27-alpine
+    ports:
+      - "${NGINX_PORT}:80"
+    volumes:
+      - ../backend:/var/www/backend:ro
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - php
+      - frontend
+    networks:
+      - lexio
+
+  postgres:
+    container_name: ${POSTGRES_CONTAINER_NAME}
+    image: postgres:17-alpine
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - lexio
+
+  rabbitmq:
+    container_name: ${RABBITMQ_CONTAINER_NAME}
+    image: rabbitmq:4-management-alpine
+    ports:
+      - "${RABBITMQ_PORT}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT}:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - lexio
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+  frontend_node_modules:
+
+networks:
+  lexio:
+    name: lexio_network
